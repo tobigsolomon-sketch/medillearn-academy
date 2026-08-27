@@ -2,7 +2,18 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
-const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey)
+let validSupabaseUrl: string | null = null
+
+try {
+  const parsedUrl = new URL(supabaseUrl ?? '')
+  if (parsedUrl.protocol === 'https:' && parsedUrl.hostname.endsWith('.supabase.co')) {
+    validSupabaseUrl = parsedUrl.toString().replace(/\/$/, '')
+  }
+} catch {
+  validSupabaseUrl = null
+}
+
+const hasSupabaseConfig = Boolean(validSupabaseUrl && supabaseAnonKey)
 
 if (!hasSupabaseConfig) {
   console.error(
@@ -18,7 +29,7 @@ if (!hasSupabaseConfig) {
 // you run `supabase gen types typescript`, swap in the generated type here
 // for full compile-time query safety.
 export const supabase = createClient(
-  supabaseUrl || 'https://placeholder.supabase.co',
+  validSupabaseUrl || 'https://placeholder.supabase.co',
   supabaseAnonKey || 'placeholder-anon-key',
   {
   auth: {
