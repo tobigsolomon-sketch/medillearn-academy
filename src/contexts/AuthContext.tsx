@@ -46,23 +46,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function signUp({ email, password, fullName }: { email: string; password: string; fullName: string }) {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    })
-    if (error) return { error: error.message }
-
-    // The `profiles` row is also created server-side by a Postgres trigger
-    // (see supabase/schema.sql) as a safety net; this upsert covers the
-    // case where the trigger hasn't run yet by the time we redirect.
-    if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        full_name: fullName,
+    try {
+      const { error } = await supabase.auth.signUp({
         email,
-        role: 'student',
+        password,
+        options: { data: { full_name: fullName } },
       })
+      if (error) return { error: error.message }
+    } catch (signupError) {
+      if (signupError instanceof TypeError) {
+        return {
+          error: 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.',
+        }
+      }
+      return { error: signupError instanceof Error ? signupError.message : 'Account creation failed.' }
     }
     return { error: null }
   }
