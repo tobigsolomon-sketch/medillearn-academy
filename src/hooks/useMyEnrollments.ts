@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
-import { useAuth } from '../contexts/AuthContext'
+import { apiGetMe } from '../lib/api'
 import type { Course, Enrollment } from '../types/database'
 
 export interface MyEnrollment extends Enrollment {
@@ -8,34 +7,36 @@ export interface MyEnrollment extends Enrollment {
 }
 
 export function useMyEnrollments() {
-  const { user } = useAuth()
   const [enrollments, setEnrollments] = useState<MyEnrollment[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    if (!user) {
-      setEnrollments([])
-      setLoading(false)
-      return
-    }
     let cancelled = false
     async function load() {
       setLoading(true)
-      const { data, error } = await supabase
-        .from('enrollments')
-        .select('*, course:courses(*)')
-        .eq('student_id', user!.id)
-        .order('applied_at', { ascending: false })
-      if (!cancelled) {
-        if (!error && data) setEnrollments(data as unknown as MyEnrollment[])
-        setLoading(false)
+      try {
+        const me = await apiGetMe()
+        if (!me || !me.id) {
+          setEnrollments([])
+          return
+        }
+
+        const res = await fetch(`http://localhost:3001/api/enrollments/student/${encodeURIComponent(me.id)}`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (cancelled) return
+        setEnrollments((data.data ?? []) as MyEnrollment[])
+      } catch {
+        if (!cancelled) setEnrollments([])
+      } finally {
+        if (!cancelled) setLoading(false)
       }
     }
     load()
     return () => {
       cancelled = true
     }
-  }, [user])
+  }, [])
 
   return { enrollments, loading }
 }

@@ -12,6 +12,15 @@ const links = [
   { to: '/verify-certificate', label: 'Verify Certificate' },
 ]
 
+const studentLinks = [
+  { to: '/student/dashboard', label: 'Dashboard' },
+  { to: '/resources', label: 'Resources' },
+]
+
+const adminLinks = [
+  { to: '/admin', label: 'Admin' },
+]
+
 export function Navbar() {
   const [open, setOpen] = useState(false)
   const { user, profile, signOut } = useAuth()
@@ -46,6 +55,38 @@ export function Navbar() {
               {l.label}
             </NavLink>
           ))}
+          {profile?.role === 'admin' &&
+            adminLinks.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                className={({ isActive }) =>
+                  `text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'text-[var(--color-teal-500)]'
+                      : 'text-[var(--color-ink-soft)] hover:text-[var(--color-navy-900)] dark:hover:text-white'
+                  }`
+                }
+              >
+                {l.label}
+              </NavLink>
+            ))}
+          {profile?.role === 'student' &&
+            studentLinks.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                className={({ isActive }) =>
+                  `text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'text-[var(--color-teal-500)]'
+                      : 'text-[var(--color-ink-soft)] hover:text-[var(--color-navy-900)] dark:hover:text-white'
+                  }`
+                }
+              >
+                {l.label}
+              </NavLink>
+            ))}
         </div>
 
         <div className="hidden lg:flex items-center gap-3">
@@ -114,6 +155,28 @@ export function Navbar() {
               {l.label}
             </NavLink>
           ))}
+          {profile?.role === 'admin' &&
+            adminLinks.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                onClick={() => setOpen(false)}
+                className="py-2.5 text-sm font-medium text-[var(--color-ink-soft)] dark:text-white/80"
+              >
+                {l.label}
+              </NavLink>
+            ))}
+          {profile?.role === 'student' &&
+            studentLinks.map((l) => (
+              <NavLink
+                key={l.to}
+                to={l.to}
+                onClick={() => setOpen(false)}
+                className="py-2.5 text-sm font-medium text-[var(--color-ink-soft)] dark:text-white/80"
+              >
+                {l.label}
+              </NavLink>
+            ))}
           <div className="h-px bg-black/5 dark:bg-white/10 my-2" />
           <button
             onClick={toggle}

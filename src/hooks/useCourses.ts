@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react'
-import { supabase } from '../lib/supabaseClient'
+import { apiGetCourses, apiGetCourse } from '../lib/api'
 import type { Course } from '../types/database'
 
 function getLoadErrorMessage(loadError: unknown, fallback: string) {
   if (loadError instanceof TypeError) {
-    return 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.'
+    return 'Unable to reach the server. Make sure the backend is running on http://localhost:3001.'
   }
   if (loadError instanceof Error) return loadError.message
   return fallback
@@ -19,18 +19,11 @@ export function useCourses(opts: { limit?: number } = {}) {
     let cancelled = false
     async function load() {
       setLoading(true)
-      let query = supabase
-        .from('courses')
-        .select('*')
-        .eq('is_published', true)
-        .order('created_at', { ascending: false })
-      if (opts.limit) query = query.limit(opts.limit)
-
       try {
-        const { data, error } = await query
+        const all = await apiGetCourses()
         if (cancelled) return
-        if (error) setError(error.message)
-        else setCourses((data ?? []) as Course[])
+        const data = all.slice(0, opts.limit ?? all.length)
+        setCourses(data as Course[])
       } catch (loadError) {
         if (cancelled) return
         setError(getLoadErrorMessage(loadError, 'Courses could not be loaded.'))
@@ -58,15 +51,10 @@ export function useCourse(slug: string | undefined) {
     async function load() {
       setLoading(true)
       try {
-        const { data, error } = await supabase
-          .from('courses')
-          .select('*')
-          .eq('slug', slug)
-          .eq('is_published', true)
-          .single()
+        const data = await apiGetCourse(slug)
         if (cancelled) return
-        if (error) setError(error.message)
-        else setCourse(data as Course)
+        setCourse(data as Course | null)
+        if (!data) setError('Course not found.')
       } catch (loadError) {
         if (cancelled) return
         setError(getLoadErrorMessage(loadError, 'Course could not be loaded.'))

@@ -10,6 +10,8 @@ import { Login } from './pages/Login'
 import { Register } from './pages/Register'
 import { StudentDashboard } from './pages/StudentDashboard'
 import { VerifyCertificate } from './pages/VerifyCertificate'
+import { AdminDashboard } from './pages/AdminDashboard'
+import { StudentResources } from './pages/StudentResources'
 import { About, Contact, FAQ, Privacy, Terms, NotFound } from './pages/StaticPages'
 
 export default function App() {
@@ -37,6 +39,24 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <StudentDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute roles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/resources"
+              element={
+                <ProtectedRoute>
+                  <StudentResources />
                 </ProtectedRoute>
               }
             />

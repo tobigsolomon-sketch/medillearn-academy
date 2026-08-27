@@ -1,11 +1,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabaseClient'
+import { apiLogin, apiLogout, apiGetMe, apiRegister } from '../lib/api'
 import type { Profile } from '../types/database'
 
 interface AuthContextValue {
-  session: Session | null
-  user: User | null
+  session: { user: { id: string; email: string; full_name?: string; role?: string } } | null
+  user: { id: string; email: string; full_name?: string; role?: string } | null
   profile: Profile | null
   loading: boolean
   signUp: (opts: { email: string; password: string; fullName: string }) => Promise<{ error: string | null }>
@@ -18,66 +17,79 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
 type AuthCredentials = { email: string; password: string }
 
-async function signUp({ email, password, fullName }: { email: string; password: string; fullName: string }) {
-  try {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } },
-    })
-    if (error) return { error: error.message }
-  } catch (signupError) {
-    if (signupError instanceof TypeError) {
-      return {
-        error: 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.',
-      }
-    }
-    return { error: signupError instanceof Error ? signupError.message : 'Account creation failed.' }
-  }
-  return { error: null }
-}
-
-async function signIn({ email, password }: AuthCredentials) {
-  const { error } = await supabase.auth.signInWithPassword({ email, password })
-  return { error: error ? error.message : null }
-}
-
-async function signOut() {
-  await supabase.auth.signOut()
-}
-
 export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const [session, setSession] = useState<Session | null>(null)
+  const [session, setSession] = useState<AuthContextValue['session']>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
 
-  async function loadProfile(userId: string) {
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
-    if (!error && data) setProfile(data as Profile)
+  async function loadProfileFromToken() {
+    const user = await apiGetMe()
+    if (user) {
+      setProfile({
+        id: user.id,
+        full_name: user.full_name,
+        email: user.email,
+        phone: null,
+        avatar_url: null,
+        country: null,
+        student_id: null,
+        role: (user.role as Profile['role']) || 'student',
+        created_at: new Date().toISOString(),
+      })
+      setSession({ user })
+    } else {
+      setProfile(null)
+      setSession(null)
+    }
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      if (data.session?.user) loadProfile(data.session.user.id)
-      setLoading(false)
-    })
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
-      if (newSession?.user) {
-        loadProfile(newSession.user.id)
-      } else {
-        setProfile(null)
-      }
-    })
-
-    return () => listener.subscription.unsubscribe()
+    loadProfileFromToken().finally(() => setLoading(false))
   }, [])
 
   const refreshProfile = useCallback(async () => {
-    if (session?.user) await loadProfile(session.user.id)
-  }, [session])
+    await loadProfileFromToken()
+  }, [])
+
+  async function signUp({ email, password, fullName }: { email: string; password: string; fullName: string }) {
+    try {
+      const res = await apiRegister(fullName, email, password)
+      if (!res?.error) {
+        await loadProfileFromToken()
+      }
+      return { error: res?.error ?? null }
+    } catch (signupError) {
+      if (signupError instanceof TypeError) {
+        return {
+          error: 'Unable to reach the server. Make sure the backend is running on http://localhost:3001.',
+        }
+      }
+      return { error: signupError instanceof Error ? signupError.message : 'Account creation failed.' }
+    }
+  }
+
+  async function signIn({ email, password }: AuthCredentials) {
+    try {
+      const res = await apiLogin(email, password)
+      if (!res?.error) {
+        await loadProfileFromToken()
+      }
+      return { error: res?.error ?? null }
+    } catch (signinError) {
+      if (signinError instanceof TypeError) {
+        return {
+          error: 'Unable to reach the server. Make sure the backend is running on http://localhost:3001.',
+        }
+      }
+      return { error: signinError instanceof Error ? signinError.message : 'Sign in failed.' }
+    }
+  }
+
+  async function signOut() {
+    await apiLogout()
+    setSession(null)
+    setProfile(null)
+  }
 
   const contextValue = useMemo(
     () => ({
@@ -90,7 +102,7 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
       signOut,
       refreshProfile,
     }),
-    [session, profile, loading, refreshProfile],
+    [session, profile, loading, refreshProfile, signIn, signUp, signOut],
   )
 
   return (
@@ -102,6 +114,6 @@ export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
 
 export function useAuth() {
   const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used within an AuthProvider')
+  if (!ctx) throw new Error('useAuth must be used within anAuthProvider')
   return ctx
 }

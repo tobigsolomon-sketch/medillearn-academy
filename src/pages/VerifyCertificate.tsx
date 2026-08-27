@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { CheckCircle2, Loader2, Search, XCircle } from 'lucide-react'
-import { supabase } from '../lib/supabaseClient'
 import { VitalRule } from '../components/VitalRule'
 
 interface CertificateResult {
@@ -20,18 +19,19 @@ export function VerifyCertificate() {
     if (!id.trim()) return
     setLoading(true)
     setResult(null)
-    // Certificates table/RPC ships with a later phase of the build (see
-    // section 17 of the product spec); this calls a public RPC so lookups
-    // never require exposing student records directly.
-    const { data, error } = await supabase
-      .rpc('verify_certificate', { cert_id: id.trim() })
-      .maybeSingle()
-    setLoading(false)
-    if (error || !data) {
+    try {
+      const res = await fetch(`http://localhost:3001/api/certificates/${encodeURIComponent(id.trim())}`)
+      const data = await res.json()
+      if (!res.ok || !data?.data) {
+        setResult('not_found')
+        return
+      }
+      setResult(data.data as CertificateResult)
+    } catch {
       setResult('not_found')
-      return
+    } finally {
+      setLoading(false)
     }
-    setResult(data as CertificateResult)
   }
 
   return (
