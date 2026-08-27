@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import type { Session, User } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabaseClient'
 import type { Profile } from '../types/database'
@@ -16,7 +16,37 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined)
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+type AuthCredentials = { email: string; password: string }
+
+async function signUp({ email, password, fullName }: { email: string; password: string; fullName: string }) {
+  try {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    })
+    if (error) return { error: error.message }
+  } catch (signupError) {
+    if (signupError instanceof TypeError) {
+      return {
+        error: 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.',
+      }
+    }
+    return { error: signupError instanceof Error ? signupError.message : 'Account creation failed.' }
+  }
+  return { error: null }
+}
+
+async function signIn({ email, password }: AuthCredentials) {
+  const { error } = await supabase.auth.signInWithPassword({ email, password })
+  return { error: error ? error.message : null }
+}
+
+async function signOut() {
+  await supabase.auth.signOut()
+}
+
+export function AuthProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,42 +75,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe()
   }, [])
 
-  async function signUp({ email, password, fullName }: { email: string; password: string; fullName: string }) {
-    try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { full_name: fullName } },
-      })
-      if (error) return { error: error.message }
-    } catch (signupError) {
-      if (signupError instanceof TypeError) {
-        return {
-          error: 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.',
-        }
-      }
-      return { error: signupError instanceof Error ? signupError.message : 'Account creation failed.' }
-    }
-    return { error: null }
-  }
-
-  async function signIn({ email, password }: { email: string; password: string }) {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    return { error: error ? error.message : null }
-  }
-
-  async function signOut() {
-    await supabase.auth.signOut()
-  }
-
-  async function refreshProfile() {
+  const refreshProfile = useCallback(async () => {
     if (session?.user) await loadProfile(session.user.id)
-  }
+  }, [session])
+
+  const contextValue = useMemo(
+    () => ({
+      session,
+      user: session?.user ?? null,
+      profile,
+      loading,
+      signUp,
+      signIn,
+      signOut,
+      refreshProfile,
+    }),
+    [session, profile, loading, refreshProfile],
+  )
 
   return (
-    <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, profile, loading, signUp, signIn, signOut, refreshProfile }}
-    >
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )

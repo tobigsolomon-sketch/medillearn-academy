@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import type { Course } from '../types/database'
 
+function getLoadErrorMessage(loadError: unknown, fallback: string) {
+  if (loadError instanceof TypeError) {
+    return 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.'
+  }
+  if (loadError instanceof Error) return loadError.message
+  return fallback
+}
+
 export function useCourses(opts: { limit?: number } = {}) {
   const [courses, setCourses] = useState<Course[]>([])
   const [loading, setLoading] = useState(true)
@@ -25,13 +33,7 @@ export function useCourses(opts: { limit?: number } = {}) {
         else setCourses((data ?? []) as Course[])
       } catch (loadError) {
         if (cancelled) return
-        setError(
-          loadError instanceof TypeError
-            ? 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.'
-            : loadError instanceof Error
-              ? loadError.message
-              : 'Courses could not be loaded.',
-        )
+        setError(getLoadErrorMessage(loadError, 'Courses could not be loaded.'))
       } finally {
         if (!cancelled) setLoading(false)
       }
@@ -67,13 +69,7 @@ export function useCourse(slug: string | undefined) {
         else setCourse(data as Course)
       } catch (loadError) {
         if (cancelled) return
-        setError(
-          loadError instanceof TypeError
-            ? 'Unable to reach Supabase. Check the Vercel environment variables and Supabase project URL.'
-            : loadError instanceof Error
-              ? loadError.message
-              : 'Course could not be loaded.',
-        )
+        setError(getLoadErrorMessage(loadError, 'Course could not be loaded.'))
       } finally {
         if (!cancelled) setLoading(false)
       }
