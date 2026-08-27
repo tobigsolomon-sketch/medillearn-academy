@@ -2,11 +2,11 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const hasSupabaseConfig = Boolean(supabaseUrl && supabaseAnonKey)
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // Fail loudly in development rather than silently hitting an undefined backend.
+if (!hasSupabaseConfig) {
   console.error(
-    'Missing Supabase environment variables. Copy .env.example to .env and fill in ' +
+    'Missing Supabase environment variables. Add ' +
       'VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY from your Supabase project settings.'
   )
 }
@@ -17,10 +17,14 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // query results are cast to our app types at the call site instead. Once
 // you run `supabase gen types typescript`, swap in the generated type here
 // for full compile-time query safety.
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key',
+  {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
   },
-})
+  },
+)
